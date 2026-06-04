@@ -1,11 +1,11 @@
 import math
 import random
-import base64
 from decimal import Decimal, ROUND_HALF_EVEN, getcontext
 from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
+from PIL import Image
 
 # ============================================================
 # CONFIGURAÇÃO
@@ -31,7 +31,7 @@ st.markdown(
         }
 
         .block-container {
-            padding-top: 1rem;
+            padding-top: 1.2rem;
             padding-bottom: 2rem;
         }
 
@@ -55,9 +55,20 @@ st.markdown(
             margin-bottom: 0.7rem;
         }
 
+        .note-box {
+            padding: 0.85rem 1rem;
+            border-radius: 12px;
+            border: 1px solid #cfd8e3;
+            background: #f5f8fc;
+            color: #111111 !important;
+            margin-top: 0.75rem;
+            margin-bottom: 0.3rem;
+        }
+
         .small-note {
-            font-size: 0.95rem;
-            color: #222222;
+            font-size: 0.97rem;
+            color: #111111 !important;
+            margin: 0;
         }
 
         .highlight-box {
@@ -222,7 +233,9 @@ def round_sig_half_even(x: Decimal, sig_digits: int) -> Decimal:
 
 def round_uncertainty_general(x: Decimal) -> Decimal:
     """
-    Regra geral das incertezas estatística e combinada.
+    Para sigma_est:
+    - 1 AS
+    - exceto se o primeiro AS for 1 ou 2, então 2 AS
     """
     x = abs(dec(x))
     if x == 0:
@@ -232,7 +245,7 @@ def round_uncertainty_general(x: Decimal) -> Decimal:
 
 def round_uncertainty_1sig(x: Decimal) -> Decimal:
     """
-    Para a incerteza do volume: sempre 1 AS.
+    Para sigma_comb e sigma_V: sempre 1 AS.
     """
     x = abs(dec(x))
     if x == 0:
@@ -343,13 +356,6 @@ def format_value_matching_uncertainty_br(value: Decimal, uncertainty: Decimal) -
     return decimal_to_br_fixed(rounded_value, places)
 
 
-def scientific_exponent_for_display(x: Decimal, sig_digits: int) -> int:
-    rounded = round_sig_half_even(dec(x), sig_digits)
-    if rounded == 0:
-        return 0
-    return rounded.adjusted()
-
-
 def common_scientific_pair_br(value: Decimal, uncertainty: Decimal, uncertainty_sig_digits: int):
     """
     Formata valor e incerteza usando o MESMO expoente científico, tomado da incerteza.
@@ -431,6 +437,25 @@ def calc_stats(values):
 
 def calc_combined(sigma_est_rounded: Decimal, sigma_instr: Decimal = SIGMA_INSTR) -> Decimal:
     return sqrt_decimal(dec(sigma_est_rounded) ** 2 + dec(sigma_instr) ** 2)
+
+
+def prepare_logo_with_top_margin(path: str, top_margin_px: int = 60, side_margin_px: int = 12, bottom_margin_px: int = 10):
+    """
+    Abre o logo e adiciona margem transparente em cima para evitar corte visual.
+    """
+    file_path = Path(path)
+    if not file_path.exists():
+        return None
+
+    img = Image.open(file_path).convert("RGBA")
+
+    new_w = img.width + 2 * side_margin_px
+    new_h = img.height + top_margin_px + bottom_margin_px
+
+    canvas = Image.new("RGBA", (new_w, new_h), (255, 255, 255, 0))
+    canvas.paste(img, (side_margin_px, top_margin_px), img)
+
+    return canvas
 
 
 def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
@@ -610,9 +635,9 @@ if "seed_L" not in st.session_state:
 col_logo, col_title = st.columns([1, 3], vertical_alignment="center")
 
 with col_logo:
-    logo_path = Path("logo_maua.png")
-    if logo_path.exists():
-        st.image(str(logo_path), use_container_width=True)
+    logo = prepare_logo_with_top_margin("logo_maua.png", top_margin_px=70, side_margin_px=10, bottom_margin_px=10)
+    if logo is not None:
+        st.image(logo, width=260)
     else:
         st.warning("Arquivo logo_maua.png não encontrado.")
 
@@ -686,14 +711,17 @@ L_values = generate_measurements(L_approx, st.session_state.seed_L)
 Dm, D_devs, D_squares, D_sum_sq, sigma_est_D = calc_stats(D_values)
 Lm, L_devs, L_squares, L_sum_sq, sigma_est_L = calc_stats(L_values)
 
+# sigma_est arredondada com regra geral
 sigma_est_D_round = round_uncertainty_general(sigma_est_D)
 sigma_est_L_round = round_uncertainty_general(sigma_est_L)
 
+# sigma_comb calculada com sigma_est arredondada
 sigma_comb_D_raw = calc_combined(sigma_est_D_round, SIGMA_INSTR)
 sigma_comb_L_raw = calc_combined(sigma_est_L_round, SIGMA_INSTR)
 
-sigma_comb_D = round_uncertainty_general(sigma_comb_D_raw)
-sigma_comb_L = round_uncertainty_general(sigma_comb_L_raw)
+# sigma_comb final arredondada com 1 AS
+sigma_comb_D = round_uncertainty_1sig(sigma_comb_D_raw)
+sigma_comb_L = round_uncertainty_1sig(sigma_comb_L_raw)
 
 D_result = round_value_to_match_uncertainty(Dm, sigma_comb_D)
 L_result = round_value_to_match_uncertainty(Lm, sigma_comb_L)
@@ -726,7 +754,11 @@ with col_init2:
     show_basic_table(L_values, "L")
 
 st.markdown(
-    '<p class="small-note">Abra as seções abaixo para visualizar o passo a passo dos cálculos.</p>',
+    """
+    <div class="note-box">
+        <p class="small-note">Abra as seções abaixo para visualizar o passo a passo dos cálculos.</p>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 st.markdown('</div>', unsafe_allow_html=True)
@@ -735,6 +767,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # D. INCERTEZA INSTRUMENTAL
 # ============================================================
 with st.expander("D. Incerteza instrumental", expanded=False):
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.write(
         "Para instrumento de medição com nônio, a incerteza instrumental "
         r"$\sigma_{instr}$ equivale à resolução."
@@ -746,6 +779,7 @@ with st.expander("D. Incerteza instrumental", expanded=False):
 # E. INCERTEZA ESTATÍSTICA
 # ============================================================
 with st.expander("E. Incerteza estatística", expanded=False):
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza estatística")
 
     tab_D, tab_L = st.tabs(["Diâmetro D", "Comprimento L"])
@@ -824,6 +858,7 @@ with st.expander("E. Incerteza estatística", expanded=False):
 # F. INCERTEZA COMBINADA
 # ============================================================
 with st.expander("F. Incerteza combinada", expanded=False):
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza combinada")
 
     tab_Dc, tab_Lc = st.tabs(["Diâmetro D", "Comprimento L"])
@@ -832,7 +867,7 @@ with st.expander("F. Incerteza combinada", expanded=False):
         st.write("Equação da incerteza combinada:")
         st.latex(r"\sigma_{comb} = \sqrt{\sigma_{est}^{2} + \sigma_{instr}^{2}}")
 
-        st.write("Substituindo os valores arredondados:")
+        st.write("Substituindo os valores arredondados de σ_est:")
         st.latex(
             rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_D, sig_digits_for_uncertainty_general(sigma_est_D))}\right)^2 + \left(0{{,}}05\right)^2}}"
         )
@@ -845,7 +880,7 @@ with st.expander("F. Incerteza combinada", expanded=False):
 
         st.markdown(
             f"Resultado final arredondado: {uncertainty_html_label('σ', 'comb')} = "
-            f"{format_sig_display_br(sigma_comb_D_raw, sig_digits_for_uncertainty_general(sigma_comb_D_raw))} mm",
+            f"{format_sig_display_br(sigma_comb_D_raw, 1)} mm",
             unsafe_allow_html=True,
         )
 
@@ -858,7 +893,7 @@ with st.expander("F. Incerteza combinada", expanded=False):
         st.write("Equação da incerteza combinada:")
         st.latex(r"\sigma_{comb} = \sqrt{\sigma_{est}^{2} + \sigma_{instr}^{2}}")
 
-        st.write("Substituindo os valores arredondados:")
+        st.write("Substituindo os valores arredondados de σ_est:")
         st.latex(
             rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_L, sig_digits_for_uncertainty_general(sigma_est_L))}\right)^2 + \left(0{{,}}05\right)^2}}"
         )
@@ -871,7 +906,7 @@ with st.expander("F. Incerteza combinada", expanded=False):
 
         st.markdown(
             f"Resultado final arredondado: {uncertainty_html_label('σ', 'comb')} = "
-            f"{format_sig_display_br(sigma_comb_L_raw, sig_digits_for_uncertainty_general(sigma_comb_L_raw))} mm",
+            f"{format_sig_display_br(sigma_comb_L_raw, 1)} mm",
             unsafe_allow_html=True,
         )
 
@@ -886,6 +921,7 @@ with st.expander("F. Incerteza combinada", expanded=False):
 # G. RESULTADO DAS MEDIÇÕES
 # ============================================================
 with st.expander("G. Resultado das medições", expanded=False):
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Resultado das medições")
 
     col_g1, col_g2 = st.columns(2)
@@ -893,8 +929,8 @@ with st.expander("G. Resultado das medições", expanded=False):
     with col_g1:
         sigma_D_places = count_decimal_places_preserved(sigma_comb_D)
         sigma_D_display = (
-            format_sig_display_br(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
-            if needs_scientific_notation_for_sig(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
+            format_sig_display_br(sigma_comb_D, 1)
+            if needs_scientific_notation_for_sig(sigma_comb_D, 1)
             else decimal_to_br_fixed(sigma_comb_D, sigma_D_places)
         )
         D_display = format_value_matching_uncertainty_br(Dm, sigma_comb_D)
@@ -913,8 +949,8 @@ with st.expander("G. Resultado das medições", expanded=False):
     with col_g2:
         sigma_L_places = count_decimal_places_preserved(sigma_comb_L)
         sigma_L_display = (
-            format_sig_display_br(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
-            if needs_scientific_notation_for_sig(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
+            format_sig_display_br(sigma_comb_L, 1)
+            if needs_scientific_notation_for_sig(sigma_comb_L, 1)
             else decimal_to_br_fixed(sigma_comb_L, sigma_L_places)
         )
         L_display = format_value_matching_uncertainty_br(Lm, sigma_comb_L)
@@ -927,13 +963,16 @@ with st.expander("G. Resultado das medições", expanded=False):
             </div>
             """,
             unsafe_allow_html=True,
-    )
+        )
+        st.caption("O valor médio deve ter o mesmo número de casas decimais da incerteza.")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
 # H. VOLUME
 # ============================================================
 with st.expander("H. Volume", expanded=False):
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Volume")
 
     st.write(
@@ -956,6 +995,7 @@ with st.expander("H. Volume", expanded=False):
 # I. INCERTEZA DO VOLUME
 # ============================================================
 with st.expander("I. Incerteza do volume", expanded=False):
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza do volume")
 
     st.write(
@@ -978,13 +1018,13 @@ with st.expander("I. Incerteza do volume", expanded=False):
     )
 
     sigma_D_for_eq = (
-        format_sig_display_latex(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
-        if needs_scientific_notation_for_sig(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
+        format_sig_display_latex(sigma_comb_D, 1)
+        if needs_scientific_notation_for_sig(sigma_comb_D, 1)
         else latex_decimal_fixed(sigma_comb_D, count_decimal_places_preserved(sigma_comb_D))
     )
     sigma_L_for_eq = (
-        format_sig_display_latex(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
-        if needs_scientific_notation_for_sig(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
+        format_sig_display_latex(sigma_comb_L, 1)
+        if needs_scientific_notation_for_sig(sigma_comb_L, 1)
         else latex_decimal_fixed(sigma_comb_L, count_decimal_places_preserved(sigma_comb_L))
     )
 
@@ -1016,6 +1056,7 @@ with st.expander("I. Incerteza do volume", expanded=False):
 # J. RESULTADO FINAL
 # ============================================================
 with st.expander("J. Resultado final", expanded=False):
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Resultado final")
 
     sigma_V_sig_digits = 1
