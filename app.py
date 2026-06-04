@@ -620,7 +620,7 @@ with col_title:
     st.write(
         "Pratique como informar o resultado final do volume "
         r"$V$ de um cilindro, incluindo sua incerteza, considerando medições "
-        r"com paquímetro de resolução $\sigma_{instr} = \pm 0{,}05\ \mathrm{mm}$."
+        r"com paquímetro de resolução 0,05 mm."
     )
 
 # ============================================================
