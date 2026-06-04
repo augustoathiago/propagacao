@@ -635,7 +635,7 @@ if "seed_L" not in st.session_state:
 col_logo, col_title = st.columns([1, 3], vertical_alignment="center")
 
 with col_logo:
-    logo = prepare_logo_with_top_margin("logo_maua.png", top_margin_px=70, side_margin_px=10, bottom_margin_px=10)
+    logo = prepare_logo_with_top_margin("logo_maua.png", top_margin_px=90, side_margin_px=10, bottom_margin_px=10)
     if logo is not None:
         st.image(logo, width=260)
     else:
@@ -767,7 +767,6 @@ st.markdown('</div>', unsafe_allow_html=True)
 # D. INCERTEZA INSTRUMENTAL
 # ============================================================
 with st.expander("D. Incerteza instrumental", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.write(
         "Para instrumento de medição com nônio, a incerteza instrumental "
         r"$\sigma_{instr}$ equivale à resolução."
@@ -779,7 +778,6 @@ with st.expander("D. Incerteza instrumental", expanded=False):
 # E. INCERTEZA ESTATÍSTICA
 # ============================================================
 with st.expander("E. Incerteza estatística", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza estatística")
 
     tab_D, tab_L = st.tabs(["Diâmetro D", "Comprimento L"])
@@ -858,7 +856,6 @@ with st.expander("E. Incerteza estatística", expanded=False):
 # F. INCERTEZA COMBINADA
 # ============================================================
 with st.expander("F. Incerteza combinada", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza combinada")
 
     tab_Dc, tab_Lc = st.tabs(["Diâmetro D", "Comprimento L"])
@@ -921,7 +918,6 @@ with st.expander("F. Incerteza combinada", expanded=False):
 # G. RESULTADO DAS MEDIÇÕES
 # ============================================================
 with st.expander("G. Resultado das medições", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Resultado das medições")
 
     col_g1, col_g2 = st.columns(2)
@@ -964,7 +960,6 @@ with st.expander("G. Resultado das medições", expanded=False):
             """,
             unsafe_allow_html=True,
         )
-        st.caption("O valor médio deve ter o mesmo número de casas decimais da incerteza.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -972,7 +967,6 @@ with st.expander("G. Resultado das medições", expanded=False):
 # H. VOLUME
 # ============================================================
 with st.expander("H. Volume", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Volume")
 
     st.write(
@@ -995,7 +989,6 @@ with st.expander("H. Volume", expanded=False):
 # I. INCERTEZA DO VOLUME
 # ============================================================
 with st.expander("I. Incerteza do volume", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza do volume")
 
     st.write(
@@ -1056,7 +1049,6 @@ with st.expander("I. Incerteza do volume", expanded=False):
 # J. RESULTADO FINAL
 # ============================================================
 with st.expander("J. Resultado final", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Resultado final")
 
     sigma_V_sig_digits = 1
