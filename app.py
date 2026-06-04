@@ -7,7 +7,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ============================================================
-# CONFIGURAÇÃO GERAL
+# CONFIGURAÇÃO
 # ============================================================
 st.set_page_config(
     page_title="Prática Propagação de Incerteza",
@@ -20,7 +20,7 @@ getcontext().prec = 60
 SIGMA_INSTR = Decimal("0.05")  # mm
 
 # ============================================================
-# ESTILO
+# CSS / ESTILO
 # ============================================================
 st.markdown(
     """
@@ -30,47 +30,33 @@ st.markdown(
         }
 
         .block-container {
-            padding-top: 1.2rem;
+            padding-top: 1rem;
             padding-bottom: 2rem;
         }
 
         .section-card {
-            padding: 1rem 1.15rem;
-            border: 1px solid #d4d9df;
+            padding: 1rem 1.1rem;
+            border: 1px solid #d7dde5;
             border-radius: 14px;
             background: #ffffff;
             margin-bottom: 1rem;
             box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+            color: #111111;
         }
 
         .result-box {
             padding: 0.95rem 1rem;
             border-radius: 12px;
-            border: 1px solid #ccd4de;
+            border: 1px solid #cfd8e3;
             background: #f5f8fc;
+            color: #111111;
             margin-top: 0.5rem;
             margin-bottom: 0.7rem;
-            color: #111111;
         }
 
         .small-note {
             font-size: 0.95rem;
-            color: #333333;
-        }
-
-        .foot {
-            font-size: 0.92rem;
-            color: #333333;
-        }
-
-        .math-note {
-            background: #f4f8ff;
-            border-left: 4px solid #3f78b5;
-            border-radius: 8px;
-            padding: 0.75rem 0.9rem;
-            color: #111111;
-            margin-top: 0.5rem;
-            margin-bottom: 0.7rem;
+            color: #222222;
         }
 
         .highlight-box {
@@ -90,6 +76,7 @@ st.markdown(
             margin-bottom: 0.9rem;
             font-size: 0.96rem;
             color: #111111;
+            background: #ffffff;
         }
 
         table.custom-table th, table.custom-table td {
@@ -97,6 +84,7 @@ st.markdown(
             padding: 8px 10px;
             text-align: center;
             vertical-align: middle;
+            color: #111111;
         }
 
         table.custom-table th {
@@ -105,14 +93,27 @@ st.markdown(
             font-weight: 600;
         }
 
-        .dark-text {
+        /* força contraste nas seções expansíveis */
+        [data-testid="stExpander"] {
+            background: #ffffff !important;
+            border: 1px solid #d7dde5 !important;
+            border-radius: 12px !important;
+        }
+
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary * {
+            color: #111111 !important;
+            background: #ffffff !important;
+        }
+
+        [data-testid="stExpander"] details,
+        [data-testid="stExpander"] details * {
             color: #111111 !important;
         }
 
-        .formula-caption {
-            color: #222222;
-            font-size: 0.97rem;
-            margin-bottom: 0.2rem;
+        /* reduz risco de texto invisível em tema escuro */
+        .stMarkdown, .stText, p, li, label, span, div {
+            color: inherit;
         }
 
         @media (max-width: 768px) {
@@ -131,7 +132,6 @@ st.markdown(
 # ============================================================
 
 def dec(x):
-    """Converte para Decimal preservando precisão de representação textual."""
     if isinstance(x, Decimal):
         return x
     return Decimal(str(x))
@@ -140,14 +140,14 @@ def dec(x):
 def sqrt_decimal(x: Decimal) -> Decimal:
     x = dec(x)
     if x < 0:
-        raise ValueError("Não é possível calcular raiz de número negativo.")
+        raise ValueError("Não é possível calcular raiz quadrada de número negativo.")
     return x.sqrt()
 
 
 def quant_step(x: Decimal, step: Decimal) -> Decimal:
     """
-    Quantiza x para múltiplos de 'step' usando arredondamento half-even.
-    Ex.: step=0.05
+    Arredonda x para múltiplos de 'step' com half-even.
+    Ex.: step = 0,05
     """
     x = dec(x)
     step = dec(step)
@@ -160,8 +160,8 @@ def count_decimal_places_preserved(x: Decimal) -> int:
     Ex.: Decimal('0.10') -> 2
     """
     x = dec(x)
-    exp = x.as_tuple().exponent
-    return -exp if exp < 0 else 0
+    exponent = x.as_tuple().exponent
+    return -exponent if exponent < 0 else 0
 
 
 def decimal_to_br_fixed(x: Decimal, places: int) -> str:
@@ -202,11 +202,11 @@ def first_significant_digit(x: Decimal) -> int:
     return int(n.as_tuple().digits[0])
 
 
-def sig_digits_for_uncertainty(x: Decimal) -> int:
+def sig_digits_for_uncertainty_general(x: Decimal) -> int:
     """
-    Regra:
-    - 1 algarismo significativo;
-    - exceto se o primeiro AS for 1 ou 2, então manter 2 AS.
+    Regra geral:
+    - 1 AS
+    - exceto se o primeiro AS for 1 ou 2, então 2 AS
     """
     fd = first_significant_digit(x)
     return 2 if fd in (1, 2) else 1
@@ -214,8 +214,7 @@ def sig_digits_for_uncertainty(x: Decimal) -> int:
 
 def round_sig_half_even(x: Decimal, sig_digits: int) -> Decimal:
     """
-    Arredonda para N algarismos significativos usando ROUND_HALF_EVEN
-    (regra do 5 para o algarismo par).
+    Arredonda para N algarismos significativos usando ROUND_HALF_EVEN.
     """
     x = dec(x)
     if x == 0:
@@ -225,42 +224,69 @@ def round_sig_half_even(x: Decimal, sig_digits: int) -> Decimal:
     return x.quantize(quantum, rounding=ROUND_HALF_EVEN)
 
 
-def round_uncertainty(x: Decimal) -> Decimal:
+def round_uncertainty_general(x: Decimal) -> Decimal:
+    """
+    Regra geral das incertezas estatística e combinada.
+    """
     x = abs(dec(x))
     if x == 0:
         return Decimal("0")
-    n_sig = sig_digits_for_uncertainty(x)
-    return round_sig_half_even(x, n_sig)
+    return round_sig_half_even(x, sig_digits_for_uncertainty_general(x))
+
+
+def round_uncertainty_1sig(x: Decimal) -> Decimal:
+    """
+    Para a incerteza do volume: sempre 1 AS, conforme solicitado.
+    """
+    x = abs(dec(x))
+    if x == 0:
+        return Decimal("0")
+    return round_sig_half_even(x, 1)
 
 
 def needs_scientific_notation_for_sig(x: Decimal, sig_digits: int) -> bool:
     """
-    Evita ambiguidades do tipo 100, 120, 1000 etc., quando o número de AS
-    ficaria escondido na escrita decimal usual.
+    Evita ambiguidades como 100, 120, 1000 etc.
     """
     x = abs(dec(x))
     if x == 0:
         return False
+
     exponent = x.adjusted()
 
-    # Para inteiros grandes em que a escrita comum esconde os AS:
-    # ex.: 100 com 1 AS; 120 com 2 AS; 1000 com 1 AS etc.
+    # inteiros grandes em que os AS ficariam ambíguos
     if exponent >= sig_digits:
         return True
 
-    # Para números muito pequenos, a escrita científica também pode ajudar;
-    # aqui mantive apenas casos realmente pequenos.
-    if x != 0 and exponent <= -4:
+    # números muito pequenos
+    if exponent <= -4:
         return True
 
     return False
 
 
+def superscript_int(n: int) -> str:
+    mapping = {
+        "-": "⁻",
+        "0": "⁰",
+        "1": "¹",
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹",
+    }
+    return "".join(mapping[ch] for ch in str(n))
+
+
 def format_sig_display_br(x: Decimal, sig_digits: int) -> str:
     """
-    Formata número arredondado para N AS.
-    Se a escrita decimal ficar ambígua, usa notação científica:
-    ex.: 1 × 10²
+    Exibe número arredondado para N AS.
+    Se houver ambiguidade na escrita decimal, usa notação científica:
+    1 × 10²
     """
     rounded = round_sig_half_even(dec(x), sig_digits)
 
@@ -270,16 +296,10 @@ def format_sig_display_br(x: Decimal, sig_digits: int) -> str:
     if needs_scientific_notation_for_sig(rounded, sig_digits):
         exponent = rounded.adjusted()
         mantissa = rounded.scaleb(-exponent)
-
-        # quantiza mantissa para manter exatamente os sig_digits
         mantissa_quant = Decimal(f"1e-{sig_digits-1}") if sig_digits > 1 else Decimal("1")
         mantissa = mantissa.quantize(mantissa_quant, rounding=ROUND_HALF_EVEN)
-
         mantissa_places = count_decimal_places_preserved(mantissa)
         mantissa_str = decimal_to_br_fixed(mantissa, mantissa_places)
-
-        if exponent == 0:
-            return mantissa_str
         return f"{mantissa_str} × 10{superscript_int(exponent)}"
 
     places = count_decimal_places_preserved(rounded)
@@ -305,27 +325,9 @@ def format_sig_display_latex(x: Decimal, sig_digits: int) -> str:
     return latex_decimal_fixed(rounded, places)
 
 
-def superscript_int(n: int) -> str:
-    mapping = {
-        "-": "⁻",
-        "0": "⁰",
-        "1": "¹",
-        "2": "²",
-        "3": "³",
-        "4": "⁴",
-        "5": "⁵",
-        "6": "⁶",
-        "7": "⁷",
-        "8": "⁸",
-        "9": "⁹",
-    }
-    return "".join(mapping[ch] for ch in str(n))
-
-
 def round_value_to_match_uncertainty(value: Decimal, uncertainty: Decimal) -> Decimal:
     """
-    Arredonda 'value' para o mesmo número de casas decimais de 'uncertainty'
-    (na representação decimal do Decimal).
+    Arredonda o valor para o mesmo número de casas decimais da incerteza.
     """
     value = dec(value)
     uncertainty = dec(uncertainty)
@@ -363,24 +365,23 @@ def html_table(headers, rows):
 
 def generate_measurements(center: Decimal, seed: int):
     """
-    Gera 5 medições próximas do valor central, usando resolução de 0,05 mm.
+    Gera 5 medições próximas do valor escolhido, em passos de 0,05 mm.
     """
     center = dec(center)
     rng = random.Random(seed)
     step = Decimal("0.05")
 
     offsets = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]
-    values = []
 
+    values = []
     for _ in range(5):
         k = rng.choice(offsets)
         v = center + Decimal(k) * step
-        if v <= 0:
-            v = Decimal("0.05")
+        if v < Decimal("1.00"):
+            v = Decimal("1.00")
         v = quant_step(v, step)
         values.append(v.quantize(Decimal("0.00"), rounding=ROUND_HALF_EVEN))
 
-    # evita todos iguais
     if len(set(values)) == 1:
         values[0] = (values[0] + step).quantize(Decimal("0.00"), rounding=ROUND_HALF_EVEN)
 
@@ -403,23 +404,19 @@ def calc_combined(sigma_est_rounded: Decimal, sigma_instr: Decimal = SIGMA_INSTR
 
 def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
     """
-    Cilindro vertical em SVG, com:
-    - diâmetro D no topo
-    - altura L à direita
-    - base inferior com arco traseiro tracejado
-    - layout largo com rolagem horizontal no celular
+    Desenha cilindro vertical em SVG.
+    Agora a cota de L mostra valor completo, sem corte.
     """
-    # Escalas visuais
-    body_w = max(210.0, 140.0 + 4.2 * d_mm)
-    body_h = max(260.0, 120.0 + 4.8 * l_mm)
+    body_w = max(220.0, 140.0 + 4.0 * d_mm)
+    body_h = max(270.0, 120.0 + 4.4 * l_mm)
 
     ellipse_rx = body_w / 2.0
     ellipse_ry = max(30.0, ellipse_rx * 0.22)
 
-    margin_left = 90.0
-    margin_top = 55.0
-    margin_right = 120.0
-    margin_bottom = 55.0
+    margin_left = 95.0
+    margin_top = 60.0
+    margin_right = 240.0   # aumentado para não cortar o valor de L
+    margin_bottom = 70.0
 
     x_center = margin_left + ellipse_rx
     top_y = margin_top + ellipse_ry
@@ -434,15 +431,11 @@ def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
     d_text = f"D = {d_mm:.2f} mm".replace(".", ",")
     l_text = f"L = {l_mm:.2f} mm".replace(".", ",")
 
-    # Linha do diâmetro no topo
-    d_y = top_y - ellipse_ry * 0.15
-    d_text_x = x_center
-    d_text_y = d_y + 46
+    d_y = top_y - ellipse_ry * 0.12
 
-    # Cota vertical de L
-    dim_x = right_x + 48
-    dim_y1 = top_y - ellipse_ry * 0.15
-    dim_y2 = bottom_y + ellipse_ry * 0.15
+    dim_x = right_x + 58
+    dim_y1 = top_y - ellipse_ry * 0.10
+    dim_y2 = bottom_y + ellipse_ry * 0.10
 
     svg = f"""
     <div style="
@@ -461,13 +454,13 @@ def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
           height="{total_h}"
           viewBox="0 0 {total_w} {total_h}"
           xmlns="http://www.w3.org/2000/svg"
-          style="display:block; max-width:none; user-select:none;"
+          style="display:block; max-width:none; user-select:none; background: #ffffff;"
           preserveAspectRatio="xMinYMin meet"
       >
         <defs>
           <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%"  stop-color="#6f70d9"/>
-            <stop offset="50%" stop-color="#7677df"/>
+            <stop offset="50%" stop-color="#7778df"/>
             <stop offset="100%" stop-color="#6a6ccc"/>
           </linearGradient>
           <marker id="arrowThin" viewBox="0 0 10 10" refX="5" refY="5"
@@ -478,7 +471,7 @@ def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
 
         <!-- corpo -->
         <rect x="{left_x}" y="{top_y}" width="{body_w}" height="{body_h}"
-              fill="url(#bodyGrad)" opacity="0.95"/>
+              fill="url(#bodyGrad)" opacity="0.96"/>
 
         <!-- laterais -->
         <line x1="{left_x}" y1="{top_y}" x2="{left_x}" y2="{bottom_y}"
@@ -494,45 +487,46 @@ def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
         <path d="M {left_x},{bottom_y}
                  A {ellipse_rx},{ellipse_ry} 0 0 1 {right_x},{bottom_y}"
               fill="none" stroke="#1022ff" stroke-width="3"
-              stroke-dasharray="12 10" opacity="0.9"/>
+              stroke-dasharray="12 10" opacity="0.95"/>
 
         <!-- base inferior: arco frontal contínuo -->
         <path d="M {right_x},{bottom_y}
                  A {ellipse_rx},{ellipse_ry} 0 0 1 {left_x},{bottom_y}"
               fill="none" stroke="#1022ff" stroke-width="3"/>
 
-        <!-- diâmetro do topo -->
+        <!-- diâmetro -->
         <line x1="{left_x}" y1="{d_y}" x2="{right_x}" y2="{d_y}"
               stroke="#111111" stroke-width="3"/>
         <circle cx="{left_x}" cy="{d_y}" r="6" fill="#111111"/>
         <circle cx="{x_center}" cy="{d_y}" r="6" fill="#111111"/>
         <circle cx="{right_x}" cy="{d_y}" r="6" fill="#111111"/>
 
-        <text x="{d_text_x}" y="{d_text_y}" text-anchor="middle"
-              font-size="52" font-family="Times New Roman, serif"
-              font-style="italic" fill="#111111">D</text>
-
-        <text x="{x_center}" y="{top_y - ellipse_ry - 12}" text-anchor="middle"
+        <text x="{x_center}" y="{top_y - ellipse_ry - 14}" text-anchor="middle"
               font-size="24" font-family="Arial, sans-serif" fill="#111111">{d_text}</text>
 
-        <!-- cota da altura -->
+        <text x="{x_center}" y="{d_y + 52}" text-anchor="middle"
+              font-size="56" font-family="Times New Roman, serif"
+              font-style="italic" fill="#111111">D</text>
+
+        <!-- cota vertical de L -->
         <line x1="{dim_x}" y1="{dim_y1}" x2="{dim_x}" y2="{dim_y2}"
               stroke="#111111" stroke-width="2.8"
               marker-start="url(#arrowThin)" marker-end="url(#arrowThin)"/>
-        <line x1="{right_x + 14}" y1="{dim_y1}" x2="{dim_x - 10}" y2="{dim_y1}"
+        <line x1="{right_x + 16}" y1="{dim_y1}" x2="{dim_x - 10}" y2="{dim_y1}"
               stroke="#111111" stroke-width="2"/>
-        <line x1="{right_x + 14}" y1="{dim_y2}" x2="{dim_x - 10}" y2="{dim_y2}"
+        <line x1="{right_x + 16}" y1="{dim_y2}" x2="{dim_x - 10}" y2="{dim_y2}"
               stroke="#111111" stroke-width="2"/>
 
-        <text x="{dim_x + 34}" y="{(dim_y1 + dim_y2)/2 + 10}" text-anchor="start"
+        <text x="{dim_x + 28}" y="{(dim_y1 + dim_y2)/2 - 8}" text-anchor="start"
               font-size="58" font-family="Times New Roman, serif"
               font-style="italic" fill="#111111">L</text>
 
-        <text x="{dim_x + 34}" y="{(dim_y1 + dim_y2)/2 + 44}" text-anchor="start"
+        <text x="{dim_x + 28}" y="{(dim_y1 + dim_y2)/2 + 28}" text-anchor="start"
               font-size="22" font-family="Arial, sans-serif" fill="#111111">{l_text}</text>
       </svg>
     </div>
     """
+
     return svg, total_h + 20
 
 
@@ -572,6 +566,10 @@ def show_full_table(values, mean, deviations, squares, symbol):
         ),
         unsafe_allow_html=True,
     )
+
+
+def uncertainty_html_label(base: str, sub: str) -> str:
+    return f"{base}<sub>{sub}</sub>"
 
 
 # ============================================================
@@ -614,7 +612,7 @@ col_p1, col_p2 = st.columns(2)
 with col_p1:
     D_slider = st.slider(
         "Diâmetro aproximado do cilindro D (mm)",
-        min_value=0.01,
+        min_value=1.00,
         max_value=100.00,
         value=20.00,
         step=0.01,
@@ -624,7 +622,7 @@ with col_p1:
 with col_p2:
     L_slider = st.slider(
         "Comprimento aproximado do cilindro L (mm)",
-        min_value=0.01,
+        min_value=1.00,
         max_value=200.00,
         value=50.00,
         step=0.01,
@@ -641,13 +639,13 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ============================================================
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.header("Imagem")
-st.caption("Em celular, arraste horizontalmente para observar toda a figura. O zoom da imagem permanece fixo.")
+st.caption("Em celular, arraste horizontalmente para observar toda a figura. O zoom permanece fixo.")
 svg_html, svg_height = cylinder_svg(float(D_slider), float(L_slider))
 components.html(svg_html, height=svg_height, scrolling=False)
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
-# GERAÇÃO DOS VALORES ALEATÓRIOS
+# GERAÇÃO DOS DADOS
 # ============================================================
 col_btn1, col_btn2 = st.columns(2)
 
@@ -665,14 +663,14 @@ L_values = generate_measurements(L_approx, st.session_state.seed_L)
 Dm, D_devs, D_squares, D_sum_sq, sigma_est_D = calc_stats(D_values)
 Lm, L_devs, L_squares, L_sum_sq, sigma_est_L = calc_stats(L_values)
 
-sigma_est_D_round = round_uncertainty(sigma_est_D)
-sigma_est_L_round = round_uncertainty(sigma_est_L)
+sigma_est_D_round = round_uncertainty_general(sigma_est_D)
+sigma_est_L_round = round_uncertainty_general(sigma_est_L)
 
 sigma_comb_D_raw = calc_combined(sigma_est_D_round, SIGMA_INSTR)
 sigma_comb_L_raw = calc_combined(sigma_est_L_round, SIGMA_INSTR)
 
-sigma_comb_D = round_uncertainty(sigma_comb_D_raw)
-sigma_comb_L = round_uncertainty(sigma_comb_L_raw)
+sigma_comb_D = round_uncertainty_general(sigma_comb_D_raw)
+sigma_comb_L = round_uncertainty_general(sigma_comb_L_raw)
 
 D_result = round_value_to_match_uncertainty(Dm, sigma_comb_D)
 L_result = round_value_to_match_uncertainty(Lm, sigma_comb_L)
@@ -685,11 +683,14 @@ sigma_V_raw = abs(V_raw) * sqrt_decimal(
     (sigma_comb_L / Lm) ** 2
 )
 
-sigma_V = round_uncertainty(sigma_V_raw)
+# item 6: incerteza do volume com 1 AS
+sigma_V = round_uncertainty_1sig(sigma_V_raw)
+
+# item 7: valor do volume com mesmo número de casas decimais da incerteza
 V_result = round_value_to_match_uncertainty(V_raw, sigma_V)
 
 # ============================================================
-# VISIBILIDADE INICIAL APENAS DOS DADOS GERADOS
+# VISIBILIDADE INICIAL
 # ============================================================
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.header("Valores aleatórios gerados (visíveis inicialmente)")
@@ -744,7 +745,9 @@ with st.expander("E. Incerteza estatística", expanded=False):
         )
 
         st.write(
-            f"Resultado sem arredondamento: σ_est = {decimal_to_br_plain(sigma_est_D, 12)} mm"
+            f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'est')} = "
+            f"{decimal_to_br_plain(sigma_est_D, 12)} mm",
+            unsafe_allow_html=True,
         )
 
         st.markdown(
@@ -757,9 +760,10 @@ with st.expander("E. Incerteza estatística", expanded=False):
             unsafe_allow_html=True,
         )
 
-        st.write(
-            f"Resultado arredondado: σ_est = "
-            f"{format_sig_display_br(sigma_est_D, sig_digits_for_uncertainty(sigma_est_D))} mm"
+        st.markdown(
+            f"Resultado arredondado: {uncertainty_html_label('σ', 'est')} = "
+            f"{format_sig_display_br(sigma_est_D, sig_digits_for_uncertainty_general(sigma_est_D))} mm",
+            unsafe_allow_html=True,
         )
 
     with tab_L:
@@ -775,7 +779,9 @@ with st.expander("E. Incerteza estatística", expanded=False):
         )
 
         st.write(
-            f"Resultado sem arredondamento: σ_est = {decimal_to_br_plain(sigma_est_L, 12)} mm"
+            f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'est')} = "
+            f"{decimal_to_br_plain(sigma_est_L, 12)} mm",
+            unsafe_allow_html=True,
         )
 
         st.markdown(
@@ -788,9 +794,10 @@ with st.expander("E. Incerteza estatística", expanded=False):
             unsafe_allow_html=True,
         )
 
-        st.write(
-            f"Resultado arredondado: σ_est = "
-            f"{format_sig_display_br(sigma_est_L, sig_digits_for_uncertainty(sigma_est_L))} mm"
+        st.markdown(
+            f"Resultado arredondado: {uncertainty_html_label('σ', 'est')} = "
+            f"{format_sig_display_br(sigma_est_L, sig_digits_for_uncertainty_general(sigma_est_L))} mm",
+            unsafe_allow_html=True,
         )
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -810,16 +817,19 @@ with st.expander("F. Incerteza combinada", expanded=False):
 
         st.write("Substituindo os valores arredondados:")
         st.latex(
-            rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_D, sig_digits_for_uncertainty(sigma_est_D))}\right)^2 + \left(0{{,}}05\right)^2}}"
+            rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_D, sig_digits_for_uncertainty_general(sigma_est_D))}\right)^2 + \left(0{{,}}05\right)^2}}"
         )
 
         st.write(
-            f"Resultado sem arredondamento: σ_comb = {decimal_to_br_plain(sigma_comb_D_raw, 12)} mm"
+            f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'comb')} = "
+            f"{decimal_to_br_plain(sigma_comb_D_raw, 12)} mm",
+            unsafe_allow_html=True,
         )
 
-        st.write(
-            f"Resultado final arredondado: σ_comb = "
-            f"{format_sig_display_br(sigma_comb_D_raw, sig_digits_for_uncertainty(sigma_comb_D_raw))} mm"
+        st.markdown(
+            f"Resultado final arredondado: {uncertainty_html_label('σ', 'comb')} = "
+            f"{format_sig_display_br(sigma_comb_D_raw, sig_digits_for_uncertainty_general(sigma_comb_D_raw))} mm",
+            unsafe_allow_html=True,
         )
 
         st.info(
@@ -833,16 +843,19 @@ with st.expander("F. Incerteza combinada", expanded=False):
 
         st.write("Substituindo os valores arredondados:")
         st.latex(
-            rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_L, sig_digits_for_uncertainty(sigma_est_L))}\right)^2 + \left(0{{,}}05\right)^2}}"
+            rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_L, sig_digits_for_uncertainty_general(sigma_est_L))}\right)^2 + \left(0{{,}}05\right)^2}}"
         )
 
         st.write(
-            f"Resultado sem arredondamento: σ_comb = {decimal_to_br_plain(sigma_comb_L_raw, 12)} mm"
+            f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'comb')} = "
+            f"{decimal_to_br_plain(sigma_comb_L_raw, 12)} mm",
+            unsafe_allow_html=True,
         )
 
-        st.write(
-            f"Resultado final arredondado: σ_comb = "
-            f"{format_sig_display_br(sigma_comb_L_raw, sig_digits_for_uncertainty(sigma_comb_L_raw))} mm"
+        st.markdown(
+            f"Resultado final arredondado: {uncertainty_html_label('σ', 'comb')} = "
+            f"{format_sig_display_br(sigma_comb_L_raw, sig_digits_for_uncertainty_general(sigma_comb_L_raw))} mm",
+            unsafe_allow_html=True,
         )
 
         st.info(
@@ -864,11 +877,10 @@ with st.expander("G. Resultado das medições", expanded=False):
     with col_g1:
         sigma_D_places = count_decimal_places_preserved(sigma_comb_D)
         sigma_D_display = (
-            format_sig_display_br(sigma_comb_D, sig_digits_for_uncertainty(sigma_comb_D))
-            if needs_scientific_notation_for_sig(sigma_comb_D, sig_digits_for_uncertainty(sigma_comb_D))
+            format_sig_display_br(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
+            if needs_scientific_notation_for_sig(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
             else decimal_to_br_fixed(sigma_comb_D, sigma_D_places)
         )
-
         D_display = format_value_matching_uncertainty_br(Dm, sigma_comb_D)
 
         st.markdown(
@@ -880,16 +892,15 @@ with st.expander("G. Resultado das medições", expanded=False):
             """,
             unsafe_allow_html=True,
         )
-        st.caption("O valor médio é arredondado para apresentar o mesmo número de casas decimais da incerteza combinada.")
+        st.caption("O valor médio é arredondado para ter o mesmo número de casas decimais da incerteza combinada.")
 
     with col_g2:
         sigma_L_places = count_decimal_places_preserved(sigma_comb_L)
         sigma_L_display = (
-            format_sig_display_br(sigma_comb_L, sig_digits_for_uncertainty(sigma_comb_L))
-            if needs_scientific_notation_for_sig(sigma_comb_L, sig_digits_for_uncertainty(sigma_comb_L))
+            format_sig_display_br(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
+            if needs_scientific_notation_for_sig(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
             else decimal_to_br_fixed(sigma_comb_L, sigma_L_places)
         )
-
         L_display = format_value_matching_uncertainty_br(Lm, sigma_comb_L)
 
         st.markdown(
@@ -901,7 +912,7 @@ with st.expander("G. Resultado das medições", expanded=False):
             """,
             unsafe_allow_html=True,
         )
-        st.caption("O valor médio é arredondado para apresentar o mesmo número de casas decimais da incerteza combinada.")
+        st.caption("O valor médio é arredondado para ter o mesmo número de casas decimais da incerteza combinada.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -937,34 +948,51 @@ with st.expander("I. Incerteza do volume", expanded=False):
 
     st.write(
         "Como o volume foi calculado a partir de medições com incertezas, "
-        "é necessário aplicar o conceito de propagação de incerteza. "
-        "No caso de produto entre duas medições:"
+        "é necessário aplicar o conceito de propagação de incerteza."
     )
 
+    st.write(
+        "No caso de um produto, considerando os expoentes de "
+        r"$D_m$ e $L_m$ na expressão do volume:"
+    )
+
+    # item 5: Dm, Lm e expoentes explícitos
     st.latex(
-        r"\sigma_{V} = V\sqrt{\left(\frac{2\sigma_{D}}{D}\right)^2 + \left(\frac{\sigma_{L}}{L}\right)^2}"
+        r"\sigma_{V} = V\sqrt{\left(\frac{\sigma_{D}\cdot \text{expoente de }D_m}{D_m}\right)^2 + \left(\frac{\sigma_{L}\cdot \text{expoente de }L_m}{L_m}\right)^2}"
+    )
+
+    st.write("Como, no volume do cilindro, o expoente de $D_m$ é 2 e o expoente de $L_m$ é 1:")
+    st.latex(
+        r"\sigma_{V} = V\sqrt{\left(\frac{2\sigma_{D}}{D_m}\right)^2 + \left(\frac{1\sigma_{L}}{L_m}\right)^2}"
     )
 
     sigma_D_for_eq = (
-        format_sig_display_latex(sigma_comb_D, sig_digits_for_uncertainty(sigma_comb_D))
-        if needs_scientific_notation_for_sig(sigma_comb_D, sig_digits_for_uncertainty(sigma_comb_D))
+        format_sig_display_latex(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
+        if needs_scientific_notation_for_sig(sigma_comb_D, sig_digits_for_uncertainty_general(sigma_comb_D))
         else latex_decimal_fixed(sigma_comb_D, count_decimal_places_preserved(sigma_comb_D))
     )
     sigma_L_for_eq = (
-        format_sig_display_latex(sigma_comb_L, sig_digits_for_uncertainty(sigma_comb_L))
-        if needs_scientific_notation_for_sig(sigma_comb_L, sig_digits_for_uncertainty(sigma_comb_L))
+        format_sig_display_latex(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
+        if needs_scientific_notation_for_sig(sigma_comb_L, sig_digits_for_uncertainty_general(sigma_comb_L))
         else latex_decimal_fixed(sigma_comb_L, count_decimal_places_preserved(sigma_comb_L))
     )
 
     st.write("Substituindo os valores:")
     st.latex(
-        rf"\sigma_{{V}} = {latex_decimal_plain(V_raw, 12)}\sqrt{{\left(\frac{{2\cdot {sigma_D_for_eq}}}{{{latex_decimal_plain(Dm, 12)}}}\right)^2 + \left(\frac{{{sigma_L_for_eq}}}{{{latex_decimal_plain(Lm, 12)}}}\right)^2}}"
+        rf"\sigma_{{V}} = {latex_decimal_plain(V_raw, 12)}\sqrt{{\left(\frac{{2\cdot {sigma_D_for_eq}}}{{{latex_decimal_plain(Dm, 12)}}}\right)^2 + \left(\frac{{1\cdot {sigma_L_for_eq}}}{{{latex_decimal_plain(Lm, 12)}}}\right)^2}}"
     )
 
-    st.write(f"Resultado sem arredondamento: σ_V = {decimal_to_br_plain(sigma_V_raw, 12)} mm³")
     st.write(
-        f"Resultado arredondado: σ_V = "
-        f"{format_sig_display_br(sigma_V_raw, sig_digits_for_uncertainty(sigma_V_raw))} mm³"
+        f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'V')} = "
+        f"{decimal_to_br_plain(sigma_V_raw, 12)} mm³",
+        unsafe_allow_html=True,
+    )
+
+    # item 6: 1 AS para a incerteza do volume
+    st.markdown(
+        f"Resultado arredondado: {uncertainty_html_label('σ', 'V')} = "
+        f"{format_sig_display_br(sigma_V_raw, 1)} mm³",
+        unsafe_allow_html=True,
     )
 
     st.info(
@@ -984,22 +1012,23 @@ with st.expander("J. Resultado final", expanded=False):
     sigma_V_places = count_decimal_places_preserved(sigma_V)
 
     sigma_V_display = (
-        format_sig_display_br(sigma_V, sig_digits_for_uncertainty(sigma_V))
-        if needs_scientific_notation_for_sig(sigma_V, sig_digits_for_uncertainty(sigma_V))
+        format_sig_display_br(sigma_V, 1)
+        if needs_scientific_notation_for_sig(sigma_V, 1)
         else decimal_to_br_fixed(sigma_V, sigma_V_places)
     )
 
+    # item 7: valor do volume com mesmo número de casas decimais da incerteza
     V_display = format_value_matching_uncertainty_br(V_raw, sigma_V)
 
     st.markdown(
         f"""
-        <div class="result-box" style="font-size: 1.15rem;">
+        <div class="result-box" style="font-size:1.15rem;">
         <b>V = {V_display} ± {sigma_V_display} mm³</b>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.caption("O valor do volume é arredondado para apresentar o mesmo número de casas decimais da incerteza.")
+    st.caption("O valor do volume é arredondado para ter o mesmo número de casas decimais da incerteza.")
 
     st.markdown('</div>', unsafe_allow_html=True)
