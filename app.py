@@ -93,7 +93,6 @@ st.markdown(
             font-weight: 600;
         }
 
-        /* força contraste nas seções expansíveis */
         [data-testid="stExpander"] {
             background: #ffffff !important;
             border: 1px solid #d7dde5 !important;
@@ -111,7 +110,6 @@ st.markdown(
             color: #111111 !important;
         }
 
-        /* reduz risco de texto invisível em tema escuro */
         .stMarkdown, .stText, p, li, label, span, div {
             color: inherit;
         }
@@ -184,9 +182,6 @@ def decimal_to_br_plain(x: Decimal, max_places: int = 12) -> str:
 
 
 def latex_decimal_plain(x: Decimal, max_places: int = 12) -> str:
-    """
-    Formato para LaTeX com vírgula decimal.
-    """
     return decimal_to_br_plain(x, max_places=max_places).replace(",", "{,}")
 
 
@@ -236,7 +231,7 @@ def round_uncertainty_general(x: Decimal) -> Decimal:
 
 def round_uncertainty_1sig(x: Decimal) -> Decimal:
     """
-    Para a incerteza do volume: sempre 1 AS, conforme solicitado.
+    Para a incerteza do volume: sempre 1 AS.
     """
     x = abs(dec(x))
     if x == 0:
@@ -254,11 +249,9 @@ def needs_scientific_notation_for_sig(x: Decimal, sig_digits: int) -> bool:
 
     exponent = x.adjusted()
 
-    # inteiros grandes em que os AS ficariam ambíguos
     if exponent >= sig_digits:
         return True
 
-    # números muito pequenos
     if exponent <= -4:
         return True
 
@@ -349,6 +342,43 @@ def format_value_matching_uncertainty_br(value: Decimal, uncertainty: Decimal) -
     return decimal_to_br_fixed(rounded_value, places)
 
 
+def scientific_exponent_for_display(x: Decimal, sig_digits: int) -> int:
+    rounded = round_sig_half_even(dec(x), sig_digits)
+    if rounded == 0:
+        return 0
+    return rounded.adjusted()
+
+
+def common_scientific_pair_br(value: Decimal, uncertainty: Decimal, uncertainty_sig_digits: int):
+    """
+    Formata valor e incerteza usando o MESMO expoente científico, tomado da incerteza.
+    O valor é arredondado para ter o mesmo número de casas decimais da mantissa da incerteza.
+    Retorna:
+      value_str, uncertainty_str, exponent
+    tal que o usuário pode exibir:
+      (value_str ± uncertainty_str) × 10^exponent
+    """
+    unc_rounded = round_sig_half_even(dec(uncertainty), uncertainty_sig_digits)
+
+    if unc_rounded == 0:
+        return decimal_to_br_plain(value), "0", 0
+
+    exponent = unc_rounded.adjusted()
+
+    unc_mantissa = unc_rounded.scaleb(-exponent)
+    unc_places = count_decimal_places_preserved(unc_mantissa)
+
+    q = Decimal(1).scaleb(-unc_places)
+
+    value_mantissa = (dec(value) / (Decimal(10) ** exponent)).quantize(q, rounding=ROUND_HALF_EVEN)
+    unc_mantissa = unc_mantissa.quantize(q, rounding=ROUND_HALF_EVEN)
+
+    value_str = decimal_to_br_fixed(value_mantissa, unc_places)
+    unc_str = decimal_to_br_fixed(unc_mantissa, unc_places)
+
+    return value_str, unc_str, exponent
+
+
 def html_table(headers, rows):
     th = "".join(f"<th>{h}</th>" for h in headers)
     trs = []
@@ -405,7 +435,6 @@ def calc_combined(sigma_est_rounded: Decimal, sigma_instr: Decimal = SIGMA_INSTR
 def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
     """
     Desenha cilindro vertical em SVG.
-    Agora a cota de L mostra valor completo, sem corte.
     """
     body_w = max(220.0, 140.0 + 4.0 * d_mm)
     body_h = max(270.0, 120.0 + 4.4 * l_mm)
@@ -415,7 +444,7 @@ def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
 
     margin_left = 95.0
     margin_top = 60.0
-    margin_right = 240.0   # aumentado para não cortar o valor de L
+    margin_right = 240.0
     margin_bottom = 70.0
 
     x_center = margin_left + ellipse_rx
@@ -469,32 +498,26 @@ def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
           </marker>
         </defs>
 
-        <!-- corpo -->
         <rect x="{left_x}" y="{top_y}" width="{body_w}" height="{body_h}"
               fill="url(#bodyGrad)" opacity="0.96"/>
 
-        <!-- laterais -->
         <line x1="{left_x}" y1="{top_y}" x2="{left_x}" y2="{bottom_y}"
               stroke="#1022ff" stroke-width="3"/>
         <line x1="{right_x}" y1="{top_y}" x2="{right_x}" y2="{bottom_y}"
               stroke="#1022ff" stroke-width="3"/>
 
-        <!-- topo -->
         <ellipse cx="{x_center}" cy="{top_y}" rx="{ellipse_rx}" ry="{ellipse_ry}"
                  fill="#8b8ce9" stroke="#1022ff" stroke-width="3"/>
 
-        <!-- base inferior: arco traseiro tracejado -->
         <path d="M {left_x},{bottom_y}
                  A {ellipse_rx},{ellipse_ry} 0 0 1 {right_x},{bottom_y}"
               fill="none" stroke="#1022ff" stroke-width="3"
               stroke-dasharray="12 10" opacity="0.95"/>
 
-        <!-- base inferior: arco frontal contínuo -->
         <path d="M {right_x},{bottom_y}
                  A {ellipse_rx},{ellipse_ry} 0 0 1 {left_x},{bottom_y}"
               fill="none" stroke="#1022ff" stroke-width="3"/>
 
-        <!-- diâmetro -->
         <line x1="{left_x}" y1="{d_y}" x2="{right_x}" y2="{d_y}"
               stroke="#111111" stroke-width="3"/>
         <circle cx="{left_x}" cy="{d_y}" r="6" fill="#111111"/>
@@ -508,7 +531,6 @@ def cylinder_svg(d_mm: float, l_mm: float) -> tuple[str, int]:
               font-size="56" font-family="Times New Roman, serif"
               font-style="italic" fill="#111111">D</text>
 
-        <!-- cota vertical de L -->
         <line x1="{dim_x}" y1="{dim_y1}" x2="{dim_x}" y2="{dim_y2}"
               stroke="#111111" stroke-width="2.8"
               marker-start="url(#arrowThin)" marker-end="url(#arrowThin)"/>
@@ -683,10 +705,7 @@ sigma_V_raw = abs(V_raw) * sqrt_decimal(
     (sigma_comb_L / Lm) ** 2
 )
 
-# item 6: incerteza do volume com 1 AS
 sigma_V = round_uncertainty_1sig(sigma_V_raw)
-
-# item 7: valor do volume com mesmo número de casas decimais da incerteza
 V_result = round_value_to_match_uncertainty(V_raw, sigma_V)
 
 # ============================================================
@@ -744,7 +763,7 @@ with st.expander("E. Incerteza estatística", expanded=False):
             rf"\sigma_{{est}} = \sqrt{{\frac{{{latex_decimal_plain(D_sum_sq, 12)}}}{{5\cdot 4}}}}"
         )
 
-        st.write(
+        st.markdown(
             f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'est')} = "
             f"{decimal_to_br_plain(sigma_est_D, 12)} mm",
             unsafe_allow_html=True,
@@ -778,7 +797,7 @@ with st.expander("E. Incerteza estatística", expanded=False):
             rf"\sigma_{{est}} = \sqrt{{\frac{{{latex_decimal_plain(L_sum_sq, 12)}}}{{5\cdot 4}}}}"
         )
 
-        st.write(
+        st.markdown(
             f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'est')} = "
             f"{decimal_to_br_plain(sigma_est_L, 12)} mm",
             unsafe_allow_html=True,
@@ -820,7 +839,7 @@ with st.expander("F. Incerteza combinada", expanded=False):
             rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_D, sig_digits_for_uncertainty_general(sigma_est_D))}\right)^2 + \left(0{{,}}05\right)^2}}"
         )
 
-        st.write(
+        st.markdown(
             f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'comb')} = "
             f"{decimal_to_br_plain(sigma_comb_D_raw, 12)} mm",
             unsafe_allow_html=True,
@@ -846,7 +865,7 @@ with st.expander("F. Incerteza combinada", expanded=False):
             rf"\sigma_{{comb}} = \sqrt{{\left({format_sig_display_latex(sigma_est_L, sig_digits_for_uncertainty_general(sigma_est_L))}\right)^2 + \left(0{{,}}05\right)^2}}"
         )
 
-        st.write(
+        st.markdown(
             f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'comb')} = "
             f"{decimal_to_br_plain(sigma_comb_L_raw, 12)} mm",
             unsafe_allow_html=True,
@@ -956,7 +975,6 @@ with st.expander("I. Incerteza do volume", expanded=False):
         r"$D_m$ e $L_m$ na expressão do volume:"
     )
 
-    # item 5: Dm, Lm e expoentes explícitos
     st.latex(
         r"\sigma_{V} = V\sqrt{\left(\frac{\sigma_{D}\cdot \text{expoente de }D_m}{D_m}\right)^2 + \left(\frac{\sigma_{L}\cdot \text{expoente de }L_m}{L_m}\right)^2}"
     )
@@ -982,13 +1000,12 @@ with st.expander("I. Incerteza do volume", expanded=False):
         rf"\sigma_{{V}} = {latex_decimal_plain(V_raw, 12)}\sqrt{{\left(\frac{{2\cdot {sigma_D_for_eq}}}{{{latex_decimal_plain(Dm, 12)}}}\right)^2 + \left(\frac{{1\cdot {sigma_L_for_eq}}}{{{latex_decimal_plain(Lm, 12)}}}\right)^2}}"
     )
 
-    st.write(
+    st.markdown(
         f"Resultado sem arredondamento: {uncertainty_html_label('σ', 'V')} = "
         f"{decimal_to_br_plain(sigma_V_raw, 12)} mm³",
         unsafe_allow_html=True,
     )
 
-    # item 6: 1 AS para a incerteza do volume
     st.markdown(
         f"Resultado arredondado: {uncertainty_html_label('σ', 'V')} = "
         f"{format_sig_display_br(sigma_V_raw, 1)} mm³",
@@ -1009,26 +1026,35 @@ with st.expander("J. Resultado final", expanded=False):
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Resultado final")
 
-    sigma_V_places = count_decimal_places_preserved(sigma_V)
+    sigma_V_sig_digits = 1
+    sigma_V_is_scientific = needs_scientific_notation_for_sig(sigma_V, sigma_V_sig_digits)
 
-    sigma_V_display = (
-        format_sig_display_br(sigma_V, 1)
-        if needs_scientific_notation_for_sig(sigma_V, 1)
-        else decimal_to_br_fixed(sigma_V, sigma_V_places)
-    )
+    if sigma_V_is_scientific:
+        value_mantissa_str, unc_mantissa_str, common_exp = common_scientific_pair_br(
+            V_raw, sigma_V, sigma_V_sig_digits
+        )
 
-    # item 7: valor do volume com mesmo número de casas decimais da incerteza
-    V_display = format_value_matching_uncertainty_br(V_raw, sigma_V)
+        result_text = (
+            f"V = ({value_mantissa_str} ± {unc_mantissa_str}) × 10{superscript_int(common_exp)} mm³"
+        )
+    else:
+        sigma_V_places = count_decimal_places_preserved(sigma_V)
+        sigma_V_display = decimal_to_br_fixed(sigma_V, sigma_V_places)
+        V_display = format_value_matching_uncertainty_br(V_raw, sigma_V)
+        result_text = f"V = {V_display} ± {sigma_V_display} mm³"
 
     st.markdown(
         f"""
         <div class="result-box" style="font-size:1.15rem;">
-        <b>V = {V_display} ± {sigma_V_display} mm³</b>
+        <b>{result_text}</b>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.caption("O valor do volume é arredondado para ter o mesmo número de casas decimais da incerteza.")
+    st.caption(
+        "Se a incerteza final do volume estiver em notação científica, o volume também será apresentado "
+        "em notação científica, com o mesmo expoente e com o mesmo número de casas decimais da mantissa da incerteza."
+    )
 
     st.markdown('</div>', unsafe_allow_html=True)
