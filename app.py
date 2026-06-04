@@ -635,9 +635,9 @@ if "seed_L" not in st.session_state:
 col_logo, col_title = st.columns([1, 3], vertical_alignment="center")
 
 with col_logo:
-    logo = prepare_logo_with_top_margin("logo_maua.png", top_margin_px=100, side_margin_px=100, bottom_margin_px=100)
+    logo = prepare_logo_with_top_margin("logo_maua.png", top_margin_px=110, side_margin_px=10, bottom_margin_px=20)
     if logo is not None:
-        st.image(logo, width=260)
+        st.image(logo, width=240)
     else:
         st.warning("Arquivo logo_maua.png não encontrado.")
 
