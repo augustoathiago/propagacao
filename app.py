@@ -927,7 +927,7 @@ with st.expander("G. Resultado das medições", expanded=False):
             </div>
             """,
             unsafe_allow_html=True,
-
+    )
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
