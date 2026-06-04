@@ -712,7 +712,7 @@ V_result = round_value_to_match_uncertainty(V_raw, sigma_V)
 # VISIBILIDADE INICIAL
 # ============================================================
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
-st.header("Valores aleatórios gerados (visíveis inicialmente)")
+st.header("Valores aleatórios gerados")
 
 col_init1, col_init2 = st.columns(2)
 
@@ -734,7 +734,6 @@ st.markdown('</div>', unsafe_allow_html=True)
 # D. INCERTEZA INSTRUMENTAL
 # ============================================================
 with st.expander("D. Incerteza instrumental", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.write(
         "Para instrumento de medição com nônio, a incerteza instrumental "
         r"$\sigma_{instr}$ equivale à resolução."
