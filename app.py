@@ -1,5 +1,6 @@
 import math
 import random
+import base64
 from decimal import Decimal, ROUND_HALF_EVEN, getcontext
 from pathlib import Path
 
@@ -745,7 +746,6 @@ with st.expander("D. Incerteza instrumental", expanded=False):
 # E. INCERTEZA ESTATÍSTICA
 # ============================================================
 with st.expander("E. Incerteza estatística", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza estatística")
 
     tab_D, tab_L = st.tabs(["Diâmetro D", "Comprimento L"])
@@ -824,7 +824,6 @@ with st.expander("E. Incerteza estatística", expanded=False):
 # F. INCERTEZA COMBINADA
 # ============================================================
 with st.expander("F. Incerteza combinada", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza combinada")
 
     tab_Dc, tab_Lc = st.tabs(["Diâmetro D", "Comprimento L"])
@@ -887,7 +886,6 @@ with st.expander("F. Incerteza combinada", expanded=False):
 # G. RESULTADO DAS MEDIÇÕES
 # ============================================================
 with st.expander("G. Resultado das medições", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Resultado das medições")
 
     col_g1, col_g2 = st.columns(2)
@@ -910,7 +908,7 @@ with st.expander("G. Resultado das medições", expanded=False):
             """,
             unsafe_allow_html=True,
         )
-        st.caption("O valor médio é arredondado para ter o mesmo número de casas decimais da incerteza combinada.")
+        st.caption("O valor médio deve ter o mesmo número de casas decimais da incerteza.")
 
     with col_g2:
         sigma_L_places = count_decimal_places_preserved(sigma_comb_L)
@@ -929,8 +927,6 @@ with st.expander("G. Resultado das medições", expanded=False):
             </div>
             """,
             unsafe_allow_html=True,
-        )
-        st.caption("O valor médio é arredondado para ter o mesmo número de casas decimais da incerteza combinada.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -938,7 +934,6 @@ with st.expander("G. Resultado das medições", expanded=False):
 # H. VOLUME
 # ============================================================
 with st.expander("H. Volume", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Volume")
 
     st.write(
@@ -961,7 +956,6 @@ with st.expander("H. Volume", expanded=False):
 # I. INCERTEZA DO VOLUME
 # ============================================================
 with st.expander("I. Incerteza do volume", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Incerteza do volume")
 
     st.write(
@@ -1022,7 +1016,6 @@ with st.expander("I. Incerteza do volume", expanded=False):
 # J. RESULTADO FINAL
 # ============================================================
 with st.expander("J. Resultado final", expanded=False):
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.header("Resultado final")
 
     sigma_V_sig_digits = 1
@@ -1049,11 +1042,6 @@ with st.expander("J. Resultado final", expanded=False):
         </div>
         """,
         unsafe_allow_html=True,
-    )
-
-    st.caption(
-        "Se a incerteza final do volume estiver em notação científica, o volume também será apresentado "
-        "em notação científica, com o mesmo expoente e com o mesmo número de casas decimais da mantissa da incerteza."
     )
 
     st.markdown('</div>', unsafe_allow_html=True)
